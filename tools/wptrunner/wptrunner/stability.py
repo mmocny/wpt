@@ -185,7 +185,7 @@ def err_string(results_dict, iterations):
 
 
 def write_inconsistent(log_fns, inconsistent, iterations):
-    """Output inconsistent tests to passed in logging functions."""
+    """Output inconsistent tests to the passed in logging functions."""
     for log in log_fns:
         log("## Unstable results ##\n")
         strings = [(
@@ -197,15 +197,17 @@ def write_inconsistent(log_fns, inconsistent, iterations):
         table(["Test", "Subtest", "Results", "Messages"], strings, log)
 
 
-def write_slow_tests(log, slow):
-    log("## Slow tests ##\n")
-    strings = [(
-        "`%s`" % markdown_adjust(test),
-        "`%s`" % status,
-        "`%.0f`" % duration,
-        "`%.0f`" % timeout)
-        for test, status, duration, timeout in slow]
-    table(["Test", "Result", "Longest duration (ms)", "Timeout (ms)"], strings, log)
+def write_slow_tests(log_fns, slow):
+    """Output slow tests to the passed in logging functions."""
+    for log in log_fns:
+        log("## Slow tests ##\n")
+        strings = [(
+            "`%s`" % markdown_adjust(test),
+            "`%s`" % status,
+            "`%.0f`" % duration,
+            "`%.0f`" % timeout)
+            for test, status, duration, timeout in slow]
+        table(["Test", "Result", "Longest duration (ms)", "Timeout (ms)"], strings, log)
 
 
 def write_results(log, results, iterations, pr_number=None, use_details=False):
@@ -353,17 +355,11 @@ def check_stability(logger, repeat_loop=10, repeat_restart=5, chaos_mode=True, m
 
         if slow:
             step_results.append((desc, "FAIL"))
-
+            log_fns = [logger.info]
             if os.getenv("TASKCLUSTER_ROOT_URL"):
-                handler = logging.FileHandler(TASKCLUSTER_OUTPUT_FILE)
-                logger.addHandler(handler)
-
-            write_slow_tests(logger.info, slow)
+                log_fns.append(get_taskcluster_logger().info)
+            write_slow_tests(log_fns, slow)
             write_summary(logger, step_results, "FAIL")
-
-            if os.getenv("TASKCLUSTER_ROOT_URL"):
-                logger.removeHandler(handler)
-
             return 1
 
         step_results.append((desc, "PASS"))

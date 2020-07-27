@@ -1,12 +1,13 @@
 import copy
 import functools
-import logging
 import imp
 import io
 import os
 from collections import OrderedDict, defaultdict
 from datetime import datetime
 from six import iteritems
+
+from . import wptlogging
 
 from mozlog import reader
 from mozlog.formatters import JSONFormatter
@@ -20,11 +21,6 @@ from wpt.markdown import markdown_adjust, table
 # If a test takes more than (FLAKY_THRESHOLD*timeout) and does not consistently
 # time out, it is considered slow (potentially flaky).
 FLAKY_THRESHOLD = 0.8
-
-
-# TODO: Pass in an option for this, and use its existence to
-# decide whether or not to write to the output file.
-TASKCLUSTER_OUTPUT_FILE = "/home/test/artifacts/checkrun.md"
 
 
 class LogActionFilter(BaseHandler):
@@ -330,6 +326,8 @@ def check_stability(logger, repeat_loop=10, repeat_restart=5, chaos_mode=True, m
     start_time = datetime.now()
     step_results = []
 
+    taskcluster_logger = wptlogging.get_taskcluster_logger(kwargs)
+
     for desc, step_func in steps:
         if max_time and datetime.now() - start_time > max_time:
             logger.info("::: Test verification is taking too long: Giving up!")
@@ -347,8 +345,8 @@ def check_stability(logger, repeat_loop=10, repeat_restart=5, chaos_mode=True, m
         if inconsistent:
             step_results.append((desc, "FAIL"))
             log_fns = [logger.info]
-            if os.getenv("TASKCLUSTER_ROOT_URL"):
-                log_fns.append(get_taskcluster_logger().info)
+            if taskcluster_logger:
+                log_fns.append(taskcluster_logger.info)
             write_inconsistent(log_fns, inconsistent, iterations)
             write_summary(logger, step_results, "FAIL")
             return 1
@@ -356,8 +354,8 @@ def check_stability(logger, repeat_loop=10, repeat_restart=5, chaos_mode=True, m
         if slow:
             step_results.append((desc, "FAIL"))
             log_fns = [logger.info]
-            if os.getenv("TASKCLUSTER_ROOT_URL"):
-                log_fns.append(get_taskcluster_logger().info)
+            if taskcluster_logger:
+                log_fns.append(taskcluster_logger.info)
             write_slow_tests(log_fns, slow)
             write_summary(logger, step_results, "FAIL")
             return 1
@@ -365,13 +363,3 @@ def check_stability(logger, repeat_loop=10, repeat_restart=5, chaos_mode=True, m
         step_results.append((desc, "PASS"))
 
     write_summary(logger, step_results, "PASS")
-
-
-# TODO: Move this to a utility location.
-tc_logger = None
-def get_taskcluster_logger():
-    global tc_logger
-    if tc_logger is None:
-        tc_logger = logging.getLogger("taskcluster-logger")
-        tc_logger.addHandler(logging.FileHandler(TASKCLUSTER_OUTPUT_FILE))
-    return tc_logger

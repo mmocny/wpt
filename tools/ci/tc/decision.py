@@ -238,17 +238,12 @@ def create_tc_task(event, task, taskgroup_id, depends_on_ids, env_extra=None):
             "env": task.get("env", {}),
         },
         "extra": {
-            "github_event": json.dumps(event),
-            "github": {
-                "customCheckRun": {
-                    # Work around https://github.com/taskcluster/taskcluster/issues/3191
-                    "textArtifactName": "public/results/checkrun.md",
-                    "annotationsArtifactName": "public/results/checkrun.md",
-                },
-            },
+            "github_event": json.dumps(event)
         },
         "routes": ["checks"]
     }
+    if "extra" in task:
+        task_data["extra"].update(task["extra"])
     if env_extra:
         task_data["payload"]["env"].update(env_extra)
     if depends_on_ids:

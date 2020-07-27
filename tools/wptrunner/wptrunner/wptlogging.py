@@ -65,3 +65,13 @@ class LoggedAboveLevelHandler(object):
             not self.has_log and
             log_levels[data["level"]] <= self.min_level):
             self.has_log = True
+
+__tc_logger = None
+def get_taskcluster_logger(kwargs):
+    """Document me"""
+    global __tc_logger
+    if kwargs['github_checks_text_file'] and __tc_logger is None:
+        __tc_logger = logging.getLogger("taskcluster-logger")
+        __tc_logger.addHandler(logging.FileHandler(
+            kwargs['github_checks_text_file']))
+    return __tc_logger
